@@ -1,0 +1,36 @@
+--- File ---
+-- Sample formats --
+0000: Unsigned integer
+0001: Signed integer        TODO: Not specific
+...                         TODO: Missing possible formats
+
+-- Types --
+uX = unsigned integer Xbits big endian
+
+-- Format --
+File:
+  - header
+  - sounds
+
+header:
+  - "SSFF"              u32     0wx53534646
+  - sampleRate          u32
+  - sampleFormat        u16
+  - bytesPerSample      u16
+  - numOfSounds         u32
+
+sounds:
+  - sound 1
+  - sound 2
+    ...
+  - sound numOfSounds
+
+sound:
+  - numOfSamples        u32
+  - sample 1
+  - sample 2
+    ...
+  - sample N
+
+--- Library ---
+It defines funcitions to write and to read a SSF file, making those usefull in a simple way.
