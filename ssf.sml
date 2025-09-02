@@ -17,7 +17,6 @@ signature SSF =
 
 structure Ssf : SSF =
   struct
-    (* size * data *)
     type sample = Word32.word
     type header = { sampleRate     : int
                   , sampleFomat    : int
