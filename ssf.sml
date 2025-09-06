@@ -3,6 +3,7 @@ signature SSF =
     type sample
     type header
     type sound
+    datatype format = UNSIGNED
 
     val writeSample: int * sample -> BinIO.outstream -> unit
     val writeHeader: header -> BinIO.outstream -> unit
@@ -13,31 +14,34 @@ signature SSF =
     val readSound:  int -> BinIO.instream -> sound
 
     val readFile: string -> header * sound list
+
+    val sampleFromWord32: format -> Word32.word -> sample
   end
 
 structure Ssf : SSF =
   struct
     type sample = Word32.word
     type header = { sampleRate     : int
-                  , sampleFomat    : int
+                  , sampleFormat    : int
                   , bytesPerSample : int
                   , numOfSounds    : int
                   }
     type sound = int * sample list
+    datatype format = UNSIGNED
 
     fun writeSample (sampleSize, inSample) outStream =
-      let fun byteOfSample i =
+      let fun byteFromSample i =
             let val shiftAmount = Word.fromInt (8 * (sampleSize - i - 1))
             in  Word8.fromLarge (Word32.toLarge (Word32.>> (inSample, shiftAmount)))
             end
-      in  BinIO.output (outStream, Word8Vector.tabulate (sampleSize, byteOfSample))
+      in  BinIO.output (outStream, Word8Vector.tabulate (sampleSize, byteFromSample))
       end
 
     fun writeHeader (inHeader : header) outStream =
       let
       in  writeSample (4, 0wx53534646 : Word32.word)                 outStream;
           writeSample (4, Word32.fromInt (#sampleRate     inHeader)) outStream;
-          writeSample (2, Word32.fromInt (#sampleFomat    inHeader)) outStream;
+          writeSample (2, Word32.fromInt (#sampleFormat    inHeader)) outStream;
           writeSample (2, Word32.fromInt (#bytesPerSample inHeader)) outStream;
           writeSample (4, Word32.fromInt (#numOfSounds    inHeader)) outStream
       end
@@ -60,13 +64,13 @@ structure Ssf : SSF =
       in  if fileType = (0wx53534646 : sample)
           then
             { sampleRate     = Word32.toInt (readSample 4 inStream)
-            , sampleFomat    = Word32.toInt (readSample 2 inStream)
+            , sampleFormat    = Word32.toInt (readSample 2 inStream)
             , bytesPerSample = Word32.toInt (readSample 2 inStream)
             , numOfSounds    = Word32.toInt (readSample 4 inStream)
             }
           else
             { sampleRate     = 0
-            , sampleFomat    = 0
+            , sampleFormat    = 0
             , bytesPerSample = 0
             , numOfSounds    = 0
             }
@@ -85,4 +89,9 @@ structure Ssf : SSF =
       in  BinIO.closeIn  inStream;
           (fileHeader, fileSounds)
       end
+
+    fun sampleFromWord32 inFormat inWord =
+      case inFormat
+      of UNSIGNED => inWord
+
   end
