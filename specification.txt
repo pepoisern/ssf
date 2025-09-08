@@ -1,7 +1,7 @@
 --- File ---
 -- Sample formats --
 0000: Unsigned integer
-0001: Signed integer        TODO: Not specific
+0001: Signed integer        TODO: Implement, and specify
 ...                         TODO: Missing possible formats
 
 -- Types --

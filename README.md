@@ -9,5 +9,6 @@ It is as of now in no way complete or finished.
 Because it's fun and it occurred to me that it could be a good language for the project.
 
 # Goals
+- Implement exception raising on invalid/bad arguments to functions
 - Expand the specification to support other kinds of sample formats
 - Expand the library to support the use of different samples formats, maybe even eliminating the need to work with the `sample` in a low level way.

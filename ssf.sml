@@ -1,9 +1,10 @@
 signature SSF =
   sig
+    datatype format = UNSIGNED | INVALID
+
     type sample
     type header
     type sound
-    datatype format = UNSIGNED
 
     val writeSample: int * sample -> BinIO.outstream -> unit
     val writeHeader: header -> BinIO.outstream -> unit
@@ -20,65 +21,76 @@ signature SSF =
 
 structure Ssf : SSF =
   struct
+    datatype format = UNSIGNED | INVALID
+
     type sample = Word32.word
     type header = { sampleRate     : int
-                  , sampleFormat    : int
+                  , sampleFormat   : format
                   , bytesPerSample : int
                   , numOfSounds    : int
                   }
     type sound = int * sample list
-    datatype format = UNSIGNED
 
-    fun writeSample (sampleSize, inSample) outStream =
+    fun writeSample (sampleSize, sample) outStream =
       let fun byteFromSample i =
             let val shiftAmount = Word.fromInt (8 * (sampleSize - i - 1))
-            in  Word8.fromLarge (Word32.toLarge (Word32.>> (inSample, shiftAmount)))
+            in  Word8.fromLarge (Word32.toLarge (Word32.>> (sample, shiftAmount)))
             end
       in  BinIO.output (outStream, Word8Vector.tabulate (sampleSize, byteFromSample))
       end
 
-    fun writeHeader (inHeader : header) outStream =
+    fun intFromFormat format =
+      case format
+        of UNSIGNED => 0
+         | _ => 0xFF
+
+    fun formatFromInt n =
+      case n
+        of 0 => UNSIGNED
+         | _ => INVALID
+
+    fun writeHeader (header : header) outStream =
       let
       in  writeSample (4, 0wx53534646 : Word32.word)                 outStream;
-          writeSample (4, Word32.fromInt (#sampleRate     inHeader)) outStream;
-          writeSample (2, Word32.fromInt (#sampleFormat    inHeader)) outStream;
-          writeSample (2, Word32.fromInt (#bytesPerSample inHeader)) outStream;
-          writeSample (4, Word32.fromInt (#numOfSounds    inHeader)) outStream
+          writeSample (4, Word32.fromInt (#sampleRate     header)) outStream;
+          writeSample (2, Word32.fromInt (intFromFormat (#sampleFormat   header))) outStream;
+          writeSample (2, Word32.fromInt (#bytesPerSample header)) outStream;
+          writeSample (4, Word32.fromInt (#numOfSounds    header)) outStream
       end
 
-    fun writeSound inSound outStream =
-      let val (bytesPerSample, sampleList) = inSound
-      in  writeSample (4, Word32.fromInt (List.length sampleList)) outStream;
-          List.foldr (fn (x, y) => writeSample (bytesPerSample, x) outStream) () sampleList
+    fun writeSound sound stream =
+      let val (bytesPerSample, sampleList) = sound
+      in  writeSample (4, Word32.fromInt (List.length sampleList)) stream;
+          List.foldl (fn (x, y) => writeSample (bytesPerSample, x) stream) () sampleList
       end
 
-    fun readSample sampleSize inStream =
-      let val readVector = BinIO.inputN (inStream, sampleSize)
+    fun readSample sampleSize stream =
+      let val readVector = BinIO.inputN (stream, sampleSize)
           fun shiftSumBytes (x : Word8.word , y : sample) =
             Word32.+ (Word32.fromLarge (Word8.toLarge x), Word32.<< (y, 0w8))
       in  Word8Vector.foldl shiftSumBytes (0w0 : sample) readVector
       end
 
-    fun readHeader inStream =
-      let val fileType = readSample 4 inStream
+    fun readHeader stream =
+      let val fileType = readSample 4 stream
       in  if fileType = (0wx53534646 : sample)
           then
-            { sampleRate     = Word32.toInt (readSample 4 inStream)
-            , sampleFormat    = Word32.toInt (readSample 2 inStream)
-            , bytesPerSample = Word32.toInt (readSample 2 inStream)
-            , numOfSounds    = Word32.toInt (readSample 4 inStream)
+            { sampleRate     = Word32.toInt (readSample 4 stream)
+            , sampleFormat   = formatFromInt (Word32.toInt (readSample 2 stream))
+            , bytesPerSample = Word32.toInt (readSample 2 stream)
+            , numOfSounds    = Word32.toInt (readSample 4 stream)
             }
           else
             { sampleRate     = 0
-            , sampleFormat    = 0
+            , sampleFormat   = UNSIGNED
             , bytesPerSample = 0
             , numOfSounds    = 0
             }
       end
 
-    fun readSound bytesPerSample inStream =
-      let val numOfSamples = Word32.toInt (readSample 4 inStream)
-      in  (bytesPerSample, List.tabulate (numOfSamples, (fn x => readSample bytesPerSample inStream)))
+    fun readSound bytesPerSample stream =
+      let val numOfSamples = Word32.toInt (readSample 4 stream)
+      in  (bytesPerSample, List.tabulate (numOfSamples, (fn x => readSample bytesPerSample stream)))
       end
 
     fun readFile fileName =
@@ -90,8 +102,9 @@ structure Ssf : SSF =
           (fileHeader, fileSounds)
       end
 
-    fun sampleFromWord32 inFormat inWord =
-      case inFormat
-      of UNSIGNED => inWord
+    fun sampleFromWord32 format inWord =
+      case format
+        of UNSIGNED => inWord
+         | _ => 0wx0 : sample
 
   end
